@@ -1,0 +1,319 @@
+<style>*{margin:0;padding:0}</style>
+<canvas id="C" style="background:black"></canvas>
+<div id="info" style="position:fixed;top:0;left:0;width:100%;color:white;font:20px monospace;padding:3px">Test</div>
+<script src="../src/microgl.js"></script>
+<script>
+
+var i,j;
+ARP.p=ARP.push;ARP.m=ARP.map;ARP.c=ARP.concat
+INVERTMAT4=(out,v)=>out.set((new DOMMatrix(v)).inverse().toFloat32Array());
+
+var vs=`
+IN mat4 model;
+IN mat4 viewp;
+IN vec4 color;
+#ifdef SKIN
+in float B;
+IN mat4 bones[6];
+#endif
+out vec3 wpos;
+out vec4 vcol;
+vec3 ROTY(vec3 v,float a){vec2 t=vec2(sin(a),cos(a));return vec3(t.y*v.x-t.x*v.z,v.y,t.x*v.x+t.y*v.z);}
+float RAND(vec2 co){return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);}
+void main(){
+wpos=pos;
+vcol=color;
+#ifdef SKIN
+wpos=(bones[int(B)]*vec4(wpos,1.0)).xyz;
+#endif    
+wpos=(model*vec4(wpos,1.0)).xyz;
+gl_Position = viewp*vec4(wpos,1.0);
+}
+`
+var fs=`
+in vec3 wpos;
+in vec4 vcol;
+IN vec3 ceye;
+vec3 scolor=vec3(1.7,1.6,1.4);
+vec3 fcolor=vec3(.8,.5,.2);
+void main() {
+vec3 N=NORM(cross(dFdx(wpos), dFdy(wpos)));
+vec3 L=NORM(vec3(0.8,0.7,0.2));
+vec4 C=(0.5+(dot(N,L)*0.5+0.5))*vcol;
+fragColor=C;
+}
+`
+INIT(C)
+var sh=PROGRAM(vs,fs)
+
+//simmetry
+SIM=(p,t,s)=>{
+    l=p.length/3
+    for(var i=0,l2=t.length;i<l2;i+=3)t.p(t[i]+l,t[i+2]+l,t[i+1]+l)
+    p.p(...p.m((a,i)=>a*s[i%3]))
+}
+
+MSG=(str)=>document.querySelector("#info").innerText=str
+
+FETCH=(u,f)=>fetch(u).then((r)=>r.arrayBuffer()).then(f)
+LOAD=(url,X,Y,Z,f)=>FETCH(url+".xbin",(a)=>{
+        var dataI=new Int8Array(a),dataU=new UINT8(a)
+        var pos=[],tris=0,l=dataU[0]
+        for(var i=1;i<=l*3;i+=3)
+            pos.p(dataI[i]/127,dataU[i+2]/255,dataI[i+1]/127)
+        tris=Array.from(dataU.subarray(l*3+2))
+        if(X)SIM(pos,tris,[-1,1,1])
+        if(Y)SIM(pos,tris,[1,-1,1])
+        if(Z)SIM(pos,tris,[1,1,-1])
+        var m=meshes[url]=MESH({pos,tris})
+        if(f)f(m,url)
+    })
+
+SKIN=(m,f)=>{
+    var v=[],d=m.pos.d
+    for(var i=0;i<d.length;i+=3)
+        v.p(f(d[i],d[i+1],d[i+2],i))
+    m.B=BUFFER(v,1)
+}
+
+var mesh=0,wire=0
+LOAD("../src/horse",0,0,0,(m)=>{
+    mesh=m;
+    var tris=[],seen={},d=m.tris.d
+    PAIR=(a,b)=>{
+        var k=a+"x"+b,k2=b+"x"+a;
+        if(seen[k]||seen[k2])return;
+        tris.push(a,b)
+        seen[k]=seen[k2]=1
+    }
+    for(var i=0;i<d.length;i+=3)
+    {
+        PAIR(d[i],d[i+1])
+        PAIR(d[i+1],d[i+2])
+        PAIR(d[i+2],d[i])
+    }
+    wire=MESH({pos:m.pos.d,tris})
+    MSG("V:" + (mesh.pos.d.length/3) + " TRIS:" + mesh.tris.d.length/3)
+})
+var point=MESH({pos:[0,0,0]})
+var cursor=[0,0,0]
+var bones=[]
+
+
+INPUT(C)
+var prev=TIME(),now=prev,dt=0,mode=0,W,H,model=M4(),tmat4=M4(),xmat4=SMAT4(M4(),[-1,1,1]),xsym=SMAT4(M4(),[-1,1,1]),zsym=SMAT4(M4(),[1,1,-1])
+var selected_vertex=0,hover_vertex=0,selected_bone=-1,hover_bone=-1
+var cams=[
+    {pos:[5,0.5,0],center:[0,.5,0],up:[0,1,0]},
+    {pos:[-5,0.5,0],center:[0,.5,0],up:[0,1,0]},
+    {pos:[0,.5,5],center:[0,.5,0],up:[0,1,0]},
+    {pos:[0,.5,-5],center:[0,.5,0],up:[0,1,0]},
+    {pos:[0,5,0],center:[0,.5,0],up:[-1,0,0]},
+    {pos:[0,-5,0],center:[0,.5,0],up:[-1,0,0]},
+    {pos:[5,5,-5],center:[0,.5,0],up:[0,1,0]},
+    {pos:[5,5,5],center:[0,.5,0],up:[0,1,0]}
+];
+
+var vps=[
+        {campos:[5,0.5,0],camcenter:[0,0.5,0],up:[0,1,0],fov:1,viewp:M4(),area:[0,0,1,1],vp:V3(4),ivp:M4(),front:V3(),right:V3(),top:V3()}
+/*      {campos:[5,0.5,0],camcenter:[0,0.5,0],up:[0,1,0],fov:1,viewp:M4(),area:[0,0,0.75,1],vp:V3(4),ivp:M4(),front:V3(),right:V3(),top:V3()},
+        {campos:[0,0.5,5],camcenter:[0,0.5,0],up:[0,1,0],fov:1,viewp:M4(),area:[.75,0,.25,.5],vp:V3(4),ivp:M4(),front:V3(),right:V3(),top:V3()},
+        {campos:[0,5,0],camcenter:[0,0,0],up:[0,0,1],fov:1,viewp:M4(),area:[.75,.5,.25,.5],vp:V3(4),ivp:M4(),front:V3(),right:V3(),top:V3()}
+    */
+]
+var hover_vp=vps[0]
+
+function renderView(view)
+{
+    var W=C.width,H=C.height
+    VIEWPORT(view.area[0]*W,view.area[1]*H,view.area[2]*W,view.area[3]*H)
+    view.vp.set(VP_DATA)
+    CAMERA(view.campos,view.camcenter,view.up,view.fov,W/H*(view.area[2]/view.area[3]),.1,1000,1)
+    INVERTMAT4(view.ivp,view.viewp)
+    view.right.set(CAM_RIGHT)
+    view.viewp.set(VP_M4)
+    view.front.set(CAM_FRONT)
+    CROSS(view.top,CAM_RIGHT,CAM_FRONT)
+
+    var hover = (MOUSE.pos[0] > view.vp[0] && MOUSE.pos[0] < view.vp[0] + view.vp[2] &&
+        (C.height - MOUSE.pos[1]) > view.vp[1] && (C.height - MOUSE.pos[1]) < view.vp[1] + view.vp[3] )
+
+    GLSET(BLEND,1)
+    BLENDFUNC("alpha")
+
+    TMAT4(tmat4,cursor)
+    DRAW(point,0,{color:[1,0,0,1],model:tmat4,psize:5},0)
+
+    if(mesh)
+    {
+        GLSET(ZTEST)
+
+        DRAW(mesh,sh,{color:[.25,.25,.25,hover?.5:.25],model})
+        gl.frontFace(gl.CW)
+        DRAW(mesh,sh,{color:[.25,.25,.25,hover?.5:.25],model:xsym})
+        gl.frontFace(gl.CCW)
+
+        DRAW(wire,0,{color:[.5,.5,.5,.5],model},1)
+        GLSET(ZTEST,0)
+        DRAW(mesh,0,{color:[1,1,1,.2],model,psize:2},0)
+        if(hover_vertex>=0)
+        {
+            TMAT4(tmat4,mesh.pos.d.subarray(hover_vertex*3,hover_vertex*3+3))
+            DRAW(point,0,{color:[1,1,1,1],model:tmat4,psize:4},0)
+        }
+        if(selected_vertex>=0)
+        {
+            TMAT4(tmat4,mesh.pos.d.subarray(selected_vertex*3,selected_vertex*3+3))
+            DRAW(point,0,{color:[1,1,0,1],model:tmat4,psize:5},0)
+        }
+    }
+
+    if(hover)
+        hover_vp = view;
+    return hover;
+}
+
+function loop()
+{
+    now=TIME(),dt=(now-prev),prev=now;
+   W=C.width=BODY.offsetWidth;H=C.height=BODY.offsetHeight;
+    requestAnimationFrame(loop);
+    INIT(C)
+    CLEAR([0,0,0,1],1)
+    GLSET(CULL,1)
+
+    for(var i=0;i<vps.length;++i)
+        renderView(vps[i]);
+
+    if(MOUSE.buttons)
+    {
+        //APPLYROT(model,model,MOUSE.delta[0]*.02,[0,1,0])
+        //APPLYROT(model,model,MOUSE.delta[1]*.02,MAT4xV3(V3(),model,[1,0,0],0))
+    }
+
+    var delta=V3()
+    if(KEYS["ArrowRight"])ADD(delta,delta,hover_vp.right,-dt)
+    if(KEYS["ArrowLeft"])ADD(delta,delta,hover_vp.right,dt)
+    if(KEYS["ArrowUp"])ADD(delta,delta,hover_vp.top,-dt)
+    if(KEYS["ArrowDown"])ADD(delta,delta,hover_vp.top,dt)
+    ADD(hover_vp.campos,hover_vp.campos,delta)
+    ADD(hover_vp.camcenter,hover_vp.camcenter,delta)
+
+    hover_vp.fov+=MOUSE.wheel*.001
+
+    ENDFRAME();
+}
+
+FINDVERTEX=(d,cursor,view)=>{
+    if(!mesh)return;
+    var c=V3([cursor[0]-view.vp[0],(C.height-cursor[1])-view.vp[1],0])
+    if(c[0]<0 || c[0] > view.vp[2] || c[1]<0 || c[1] > view.vp[3] )
+        return -1; //out
+
+    var p2D=V3()
+    for(var i=0;i<d.length;i+=3)
+    {
+        var v=d.subarray(i,i+3)
+        PROJ3D(p2D,view.viewp,v)
+        p2D[0]=REMAP(p2D[0],0,1,0,view.vp[2])
+        p2D[1]=REMAP(p2D[1],0,1,0,view.vp[3])
+        p2D.z=0
+        var dist=DIST(p2D,c)
+        if(dist<10)
+            return i/3
+    }
+    return -1
+}
+
+ADDBONE=()=>{
+    bones.push(V3(cursor))
+}
+
+PROJ3D=(out,m,a)=>{var ix=a[0],iy=a[1],iz=a[2],ox=m[0]*ix+m[4]*iy+m[8]*iz+m[12],oy=m[1]*ix+m[5]*iy+m[9]*iz+m[13],oz=m[2]*ix+m[6]*iy+m[10]*iz+m[14],ow=m[3]*ix+m[7]*iy+m[11]*iz+m[15];out[0]=(ox/ow+1)/2;out[1]=(oy/ow+1)/2;out[2]=(oz/ow+1)/2;if(out.length>3){out[3]=ow};return out}
+
+SCREENTOCAM=(out,x,y,ivp,W=C.width,H=C.height)=>PROJ3D(out||V3(),ivp,[REMAP(x,0,W,-1,1),REMAP(y,0,H,-1,1),.5])
+
+TESTRAY=(start, dir, P, N, out)=>{
+    var numer=DOT(P,N)-DOT(N,start),denom=DOT(N,dir)
+    if( ABS(denom)<1e-5) return 0
+    var t=(numer/denom);
+    if(t<0) return 0; //behind the ray
+    if(out)ADD(out,start,dir,t)
+    return 1
+},
+
+ONMOUSE=(e)=>{
+    if(e.type=="mousedown")
+    {
+        selected_vertex=hover_vertex
+        //MSG(selected_vertex!=-1?selected_vertex+":"+mesh.pos.d.subarray(selected_vertex,selected_vertex+3):"")
+    }
+    else if(e.type=="mousemove")
+    {
+        if(mesh)
+            hover_vertex=FINDVERTEX(mesh.pos.d,MOUSE.pos,hover_vp)
+        //var dir=SUB(V3(),CAM_EYE,SCREENTOCAM(MOUSE.pos[0]-hover_vp.vp[0],MOUSE.pos[1]-hover_vp.vp[1],hover_vp.ivp,V3(),hover_vp.vp[2],hover_vp[3]));
+        var v=SCREENTOCAM(V3(),MOUSE.pos[0],MOUSE.pos[1],hover_vp.ivp);
+        var dir=NORM(V3(),SUB(V3(),v,CAM_EYE));
+        console.log(dir)
+        TESTRAY(CAM_EYE,dir,[0,0,0],[0,0,1],cursor)
+    }
+    else if(e.type=="mouseup")
+    {
+    }
+}
+
+function ONKEY(e)
+{
+    if(e.type=="keydown")
+        return;
+    var cam=0
+    if(e.code=="Digit1") cam=cams[0]
+    if(e.code=="Digit2") cam=cams[1]
+    if(e.code=="Digit3") cam=cams[2]
+    if(e.code=="Digit4") cam=cams[3]
+    if(e.code=="Digit5") cam=cams[4]
+    if(e.code=="Digit6") cam=cams[5]
+    if(e.code=="Digit7") cam=cams[6]
+    if(e.code=="Digit8") cam=cams[7]
+    if(cam)
+    {
+        hover_vp.campos=V3(cam.pos)
+        hover_vp.camcenter=V3(cam.center)
+        hover_vp.up=V3(cam.up)
+    }
+
+    if(e.code=="KeyA")
+    {
+        ADDBONE();
+    }
+}
+
+function downloadFile( filename, data, dataType )
+{
+	if(!dataType)
+	{
+		if(data.constructor === String )
+			dataType = 'text/plain';
+		else
+			dataType = 'application/octet-stream';
+	}
+
+	var file = null;
+	if(data.constructor !== File && data.constructor !== Blob)
+		file = new Blob( [ data ], {type : dataType});
+	else
+		file = data;
+	var url = URL.createObjectURL( file );
+	var element = document.createElement("a");
+	element.setAttribute('href', url);
+	element.setAttribute('download', filename );
+	element.style.display = 'none';
+	document.body.appendChild(element);
+	element.click();
+	document.body.removeChild(element);
+}
+
+
+loop();
+</script>
