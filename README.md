@@ -6,4 +6,4 @@ minify using: npm -g install minify
 
 ![](preview.png)
 
-Test it here: [DEMO](https://tamats.com/games/copter/)
+Test it here: [DEMO](https://tamats.com/games/xiii/compo)
