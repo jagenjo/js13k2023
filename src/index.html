@@ -21,9 +21,11 @@ IN float bw;
 out vec3 wpos;
 out vec4 vcol;
 vec3 ROTY(vec3 v,float a){vec2 t=vec2(sin(a),cos(a));return vec3(t.y*v.x-t.x*v.z,v.y,t.x*v.x+t.y*v.z);}
+float PI=3.1415926;
 void main(){
 wpos=pos;
 vcol=color;
+float id=float(gl_InstanceID);
 if(mat==2.0)wpos.z=sin(wpos.x*8.0+time*5.0)*(wpos.x)*.05;
 if(mat==8.0)wpos.xz=NORM(wpos.xz)*.3;
 #ifdef SKIN
@@ -31,7 +33,7 @@ wpos=mix(wpos,(bones[int(B)]*vec4(wpos,1.0)).xyz,bw);
 #endif    
 #ifdef INST
 if(mat==7.0)wpos*=.1;
-wpos=ROTY(wpos,offs.w*6.2831853);
+wpos=ROTY(wpos,offs.w*PI*2.0);
 wpos+=offs.xyz;
 wpos.y-=length(ceye-wpos)*.0001;
 #endif
@@ -40,7 +42,7 @@ if(mat==4.0)wpos.y=.02;
 gl_Position = viewp*vec4(wpos,1.0);
 }
 `
-
+//if(mat==10.0)wpos=vec3(sin(1203.1*id*.5),0.0,-id/3.0)+ROTY(wpos,id*11.7);
 //float RAND(vec2 co){return fract(sin(dot(co,vec2(12.9898,78.233)))*43758.5453);}
 //if(mat==6.0)wpos.y=cos(wpos.z/6.28)*cos(wpos.x/6.28)*(.5+.7*RAND(wpos.xz)); //mountains
 
@@ -58,7 +60,8 @@ vec3 N=NORM(cross(dFdx(wpos),dFdy(wpos)));
 vec3 L=NORM(vec3(.2,.7,-.8));
 vec4 C=(dot(N,L)*0.5+0.5)*vcol;
 if(mat==1.0)C.xyz+=vec3(0.02)*(fract(wpos.y*3.0)>0.95?-1.0:(fract(wpos.x+0.5*(floor(wpos.y*3.0)))>0.98?-1.0:1.0));
-if(mat==3.0&&wpos.x>75.0) C.xyz=mix(C.xyz,vec3(.3,.5,.6),min(1.0,(wpos.x-75.0)*.1));
+if(mat==3.0&&wpos.x>75.0)C.xyz=mix(C.xyz,vec3(.3,.5,.6),min(1.0,(wpos.x-75.0)*.1));
+if(mat==3.0&&abs(wpos.x+sin(wpos.z/17.0))<2.0)C.xyz*=.9;
 if(mat==9.0&&N.y>0.2)C.xyz=vec3(.6,.1,.0);
 C.xyz+=max(0.0,-N.y)*fcolor*.25;
 float dist=distance(ceye,wpos);
@@ -133,16 +136,16 @@ meshes.flag=MESH(f)
 
 //palette
 var fcolor=[.8,.5,.2,1],scolor=[.7,.6,.4,1],ftex=0,fbo=0
-var NOW=0,PREV=0,GTIME=0
+var NOW=0,PREV=0,GTIME=0,STIME=5
 
 //GAME
-var PVEL=[0,0,0],PANG=0,phase=0,BTS=[],bulletbuf=BUFFER(V3(1024*3),3),bulletbuf2=BUFFER(V3(1024*4),4)
-SHOOT=(id,pos,vel,s=30,t=10)=>{if(BTS.length<1023)BTS.p({id,pos,vel:NORM(V3(),vel).SCALE(s),t,pos2:V3(pos)})}
+var BTS=[],bulletbuf=BUFFER(V3(1024*3),3),bulletbuf2=BUFFER(V3(1024*4),4)
+SHOOT=(id,pos,vel,s=30,t=10)=>{if(BTS.length<1023)BTS.p({id,pos,vel:V3(vel).SCALE(s),t,pos2:V3(pos)})}
 var PTS=[];NEWPT=(pos,vel,t=10)=>PTS.p({pos,vel,t})
 
-rrocks=[],rroad=[]
-for(i=0;i<200;++i){rrocks.p(RAND(50,-25),0,RAND(50,-25),RAND());rroad.p(RAND()+(i%2-1)/2+NSIN(i/20),0,-i/3,RAND())}
-rocks=BUFFER(rrocks,4),road=BUFFER(rroad,4)
+rrocks=[]
+for(i=0;i<200;++i)rrocks.p(RAND(50,-25),0,RAND(50,-25),RAND())
+rocks=BUFFER(rrocks,4)
 
 var R=M4(),T=M4()
 ROTBONE=(out,v,ang,axis=[1,0,0],m)=>{
@@ -181,14 +184,14 @@ for(j=0;j<64;++j)
 
 
 //scene
-var objs=[],men=[],lid=0
-
+var objs=[],men=[],lid=0,Cdist=-200,Clife=1,Cpos=[0,0,0]
+//types=>0:archer,1:knight,2:horse,3:soldier,4:cart
 NEWMAN=(t,pos,ang=0,speed=0)=>{
-    var m={type:t,lean:0,arrows:5,off:[RAND(10,-5),0,RAND(10,-5)],color:[.5,.5,.5,1],rdy:1,id:lid++,pos,ang,speed,phase:RAND(),vel:V3(),life:1,pos2:ADD([],pos,[0,1.5,0])}
+    var m={type:t,lean:0,arrows:15,off:[RAND(10,-5),0,RAND(10,-5)],color:[.5,.5,.5,1],rdy:1,id:lid++,pos,ang,speed,phase:RAND(),vel:V3(),life:1,pos2:ADD([],pos,[0,1.5,0])}
     men.p(m)
     return m;
 }
-for(i=-5;i<5;++i){NEWMAN(0,[i-RAND(.5),0,-50+(!i?2:0)],0,0);NEWMAN(1,[i-RAND(.5),0,-5+(!i?2:0)],PI,0)}
+for(i=-5;i<5;++i){NEWMAN(0,[80+(!i?-2:0),0,i-RAND(.5)-250],PI/2,0);NEWMAN(1,[i-RAND(.5),0,-5+(!i?2:0)],PI,0)}
 var PLY=men[10],pidx=0,carnak=[0,-.2,-30]
 
 //fort
@@ -228,12 +231,12 @@ armright=TRS(0,[.1,.77,-.02],[-4,0,.1],.4),shadowc=[0.2,0.1,0,1]
 //armright_aim=TRS(0,[.1,.77,-.05],[PI/2,0,.3],[.7,.2,.4])
 
 //main loop
-var camA=PLY.ang+PI,camY=.2,camZ=4,camF=0,eye=V3(),camS=0.01,FTIME=1
-CAM_EYE.set([0,5,-50])
+var camA=PLY.ang+PI,camY=.2,camZ=4,camF=0,eye=V3(),camS=0.01
+CAM_EYE.set([180,5,-250])
 loop=()=>{
     requestAnimationFrame(loop)
     NOW=TIME()
-    var dt=MIN(0.1,NOW-PREV),focus=PLY.life&&FTIME>=0&&(MOUSE.buttons&2);PREV=NOW
+    var dt=MIN(0.1,NOW-PREV),focus=PLY.life&&(MOUSE.buttons&2);PREV=NOW
     var W=C.width=BODY.offsetWidth,H=C.height=BODY.offsetHeight
     
     if(!fbo||fbo.w!=W>>1)
@@ -243,11 +246,9 @@ loop=()=>{
     }
 
     if(focus)//slowmo
-        {dt*=0.2;FTIME-=dt}
-    else
-        FTIME=MIN(1,FTIME+dt*.5)
+        dt*=0.2
 
-    GTIME+=dt
+    GTIME+=dt;STIME-=dt
 
     //render
     INIT(C)
@@ -280,7 +281,7 @@ loop=()=>{
     DRAW("tower",sh_inst,{mat:0,color:fcolor,model:TRS(0,[0,0,100],[0,PI/2,0],3)},4,200,{offs:rocks})
     for(j=-2;j<=2;++j){
         var z=ROUND(j+PLY.pos[2]/50)*50
-        DRAW(m,sh_inst,{mat:0,color:[.4,.2,.1,1],model:TRS(0,[0,-.13,z],0,[1,.2,1])},4,200,{offs:road})
+        //DRAW(m,sh,{mat:10,color:[.4,.2,.1,1],model:TRS(0,[0,-.13,z],0,[1,.2,1])},4,200)//road
         for(i=-2;i<=2;++i){
         var x=ROUND(i+PLY.pos[0]/50)*50
         if(x>50)continue;
@@ -294,29 +295,43 @@ loop=()=>{
     objs.forEach((o,i)=>DRAW(meshes[o.mesh],sh,o.unif,o.prim))
 
     DRAWMAN=(m)=>{
+        var dist=DIST(m.pos,CAM_EYE)
+        if(dist>150)return;
         var t=m.type,RED=[.8,.1,.1,1],BLUE=[.1,.4,.7,1],BROWN=[.4,.2,.1,1],BLACK=[.1,.1,.1,1],bw=CLAMP(m.speed/3,0,1),ph=m.phase
 
-        //COMPUTEBONES(bones,m.phase,m.speed)
-        var frame=frames[((ph*64)|0)%64]
         TRS(PMODEL,[m.pos[0],(m.life?(m.pos[1]+ABS(NSIN(ph/2))*.04-.02):-.3)-MAX(0,m.pos[0]-75)*.02,m.pos[2]],[0,-m.ang,0],[t?1.2:1,1,1])
+        if(t<3){
         //horse
+        var frame=frames[((ph*64)|0)%64]
         DRAW("horse",sh_skin,{mat:0,bw,bones:frame.data,color:t?BLACK:BROWN,model:PMODEL})
         DRAW("horse",sh_skin,{mat:4,bw,bones:frame.data,color:shadowc,model:PMODEL})
+        }
         //knight
         bodyang=NSIN(ph-.2)*.05
-        MULTMAT4(HMODEL,PMODEL,TRS(HMODEL,[0,0.16,-.1],0,.9))
 
-        ROTBONE(AMODEL,[0,.5,0],NSIN(ph)*.2-.5,[1,0,0],HMODEL);
+        if(m.life<=0)TRS(PMODEL,m.pos,[PI/2,PI*1.04,PI/2],1)
+
+        //legs
+        MULTMAT4(HMODEL,PMODEL,TRS(HMODEL,[0,0.16,-.1],0,.9))
+        ROTBONE(AMODEL,[0,.5,0],m.life*NSIN(ph)*.2-.5,[1,0,0],HMODEL);
         DRAW("leg",sh,{mat:0,color:armcol,model:AMODEL})
+
+        //torso
         APPLYTRANS(PMODEL,PMODEL,[0,.1,-.1])
         ROTBONE(HMODEL,[0,.5,0],m.lean*.4,[0,0,1],PMODEL)
         DRAW("torso",sh,{mat:0,color:m.color,model:HMODEL})
-        TRS(AMODEL,[0,.82,0],[NSIN(ph+.5)*.1,0,0],.2,HMODEL)
-        DRAW("head",sh,{mat:t==0?0:8,color:t?RED:BLUE,model:AMODEL})
-        MULTMAT4(AMODEL,HMODEL,armleft)
-        DRAW("arm",sh,{mat:0,color:armcol,model:AMODEL})
-        MULTMAT4(AMODEL,HMODEL,armright)
-        DRAW("arm",sh,{model:AMODEL})
+
+        if(dist<80) //head and arms
+        {
+            TRS(AMODEL,[0,.82,0],[NSIN(ph+.5)*.1,0,0],.2,HMODEL)
+            DRAW("head",sh,{mat:t==0?0:8,color:t?RED:BLUE,model:AMODEL})
+            if(m.life>0){
+            MULTMAT4(AMODEL,HMODEL,armleft)
+            DRAW("arm",sh,{mat:0,color:armcol,model:AMODEL})
+            MULTMAT4(AMODEL,HMODEL,armright)
+            DRAW("arm",sh,{model:AMODEL})
+            }
+        }
         /*
         else if(t==2)
         {
@@ -366,17 +381,17 @@ loop=()=>{
     //UI
     if(focus&&PLY.rdy)
         DRAW(QUAD,sh_ui,{color:[1,1,1,1],rect:[0.5,0.5,.003,.003]})
-    DRAW(QUAD,sh_ui,{color:[0.6,0.7,0.8,1],rect:[0,0,1*FTIME,.01]})
+    DRAW(QUAD,sh_ui,{color:[0.8,0.4,0.2,1],rect:[0,0,Clife,.01]})
     for(i=0;i<PLY.arrows;++i)
         DRAW(QUAD,sh_ui,{color:PLY.rdy>=1?[.9,.9,.9,1]:[0,0,0,1],rect:[0.02+i*.015,0.02,.005,.09]})
 
     //update
-    camS=focus?.005:.01
+    camS=.01//?.005:.01
     if(DOC.pointerLockElement)
     {
-        camA-=MOUSE.delta[0]*-camS//MOUSE.buttons?MOUSE.delta[0]*0.03:0
+        camA-=MOUSE.delta[0]*-camS*.4//MOUSE.buttons?MOUSE.delta[0]*0.03:0
         camY=CLAMP(camY+MOUSE.delta[1]*camS,-PI/4,PI/4)
-        camZ+=MOUSE.wheel*0.01
+        camZ=CLAMP(camZ+MOUSE.wheel*0.01,1,10)
     }
 
     var old=PLY.ang
@@ -390,20 +405,21 @@ loop=()=>{
         if(KEYS["E"])PLY.lean=1
         if(KEYS["Q"])PLY.lean=-1
     }
-    var hs=men.filter(a=>!a.type),ks=men.filter(a=>a.type);
-    if(KEYSP["Space"]){pidx=(pidx+1)%hs.length;PLY=hs[pidx]}
+    var tmen=[[],[],[],[],[]];men.forEach(a=>tmen[a.type].p(a))
+    if(KEYSP["Space"]){pidx=(pidx+1)%tmen[0].length;PLY=tmen[0][pidx]}
     camA+=PLY.ang-old
 
     if(PLY.rdy>=1&&PLY.arrows&&PLY.life==1&&MOUSE.buttons==3&&!(MOUSE.prevb==3))
     {
-        SHOOT(PLY,V3(CAM_EYE),CAM_FRONT,30)//.ADD(PLY.vel)
+        SHOOT(PLY,V3(CAM_EYE),CAM_FRONT.MUL(30).ADD(PLY.vel),1)
         PLY.rdy=0;PLY.arrows--
     }
 
     BTS.forEach((p,i)=>{
         if(p.t>0)p.pos2.set(p.pos);p.t-=dt;ADD(p.vel,p.vel,[0,-.5,0],dt);ADD(p.pos,p.pos,p.vel,dt);ADD(p.vel,p.vel,p.vel,-dt*.2);
         if(p.pos[1]<0){p.vel.fill(0);p.t=MIN(0,p.t)}//collided
-        if(p.t>0)men.forEach(k=>{if(p.id!=k&&DIST(k.pos2,p.pos)<.4){k.life=0;p.vel.fill(0);p.t=-10}})//arrow hit
+        if(p.t>0)men.forEach(k=>{if(p.id!=k&&DIST(k.pos2,p.pos)<.5){k.life=0;p.vel.fill(0);p.t=-10}})//arrow hit
+        if(p.t>0&&DIST(p.pos,Cpos)<2&&p.id)Clife-=.1
     })
     BTS=BTS.filter(p=>p.t>-5)//kill
     PTS.forEach((p,i)=>{
@@ -413,11 +429,14 @@ loop=()=>{
 
     //update
     men.forEach(m=>{
+        var t=m.type,p=m.pos
+        if(m.life<=.0){m.speed*=.99;return}
         m.phase+=dt*MIN(1.5,m.speed*.6)
         m.ang=m.ang%(2*PI)
-        ROTY(m.vel,[0,0,m.speed],m.ang)
-        ADD(m.pos,m.pos,m.vel,dt)
-        if(m!=PLY&&m.life>0)//&&!m.type)
+        if(t<3)ROTY(m.vel,[0,0,m.speed],m.ang)//speed only to horses
+        ADD(p,p,m.vel,dt)
+        if(m!=PLY)
+        if(m!=PLY&&m.life>0&&t<2)//&&!m.type) //orient to target
         {
             var trg=ADD(V3(),PLY.pos,m.off)
             var ang=ATAN2(m.pos[0]-trg[0],trg[2]-m.pos[2])%(2*PI)
@@ -426,37 +445,37 @@ loop=()=>{
             m.speed=MAX(0,PLY.speed-SIN(m.id)*.5)
         }
         if(!focus||m!=PLY)
-            m.speed=MIN(8,m.speed*0.995)//friction
+            m.speed=MIN(8,m.speed*0.997)//friction
+        p[2]=MIN(p[2],-5)
         //if(m.pos[0]<-50||m.pos[2]>4)m.speed=0//out
         //m.pos[0]=CLAMP(m.pos[0],-50,4);m.pos[2]=CLAMP(m.pos[2],-50,50)
-        if(m.life<=0)m.speed*=.99
-        ADD(m.pos2,m.pos,[0,.5,0])
-        if(DIST(m.pos,carnak)<.5)m.arrows=15
+        ADD(m.pos2,p,[0,.5,0])
+        if(DIST(p,carnak)<.5)m.arrows=15//pickup
         m.rdy=MIN(1,m.rdy+dt*.25)
-        if(m.speed>2&&RAND()>.9&&m.pos[0]<75&&PTS.length<1023)NEWPT(V3(m.pos),V3(m.vel).ADD([RAND()-.5,RAND(),RAND()-.5]),4)
-        /*
-        else
-        {
-            m.rdy=MIN(1,m.rdy+dt*.25)
-        }
-        */
+        if(DIST(CAM_EYE,p)<50&&m.speed>2&&RAND()>.9&&p[0]<75&&PTS.length<1023)NEWPT(V3(p),V3(m.vel).ADD([RAND()-.5,RAND(),RAND()-.5]),4)//smoke
     })
 
-    TRS(house.unif.model,[0,.2,-100+GTIME*.5],0,[1.5,1.5,3])
+    if(Clife>0)Cdist+=dt
+    Cpos=[0,.5,Cdist]
+    TRS(house.unif.model,[0,Clife>0?.2:-.1,Cdist],0,[1.5,1.5,3])
     
-    /*
-    var m=ks[RAND(ks.length)|0]
-    if(STIME<0&&m)
+    var m=men[RAND(men.length)|0]
+    var m2=men[RAND(men.length)|0]
+    if(STIME<0)
     {
-        m.ang=ATAN2(PLY.pos2[0]-m.pos2[0],PLY.pos2[2]-m.pos2[2])
-        if(m.rdy>=1&&DIST(m.pos2,PLY.pos2)<50){
-            SHOOT(m,V3(m.pos2),SUB(V3(),PLY.pos2,m.pos2).ADD(PLY.vel).ADD([0,.5,0]))
+        //m.ang=ATAN2(PLY.pos2[0]-m.pos2[0],PLY.pos2[2]-m.pos2[2])
+        if(!m.type&&DIST(Cpos,m.pos)<40)
+            SHOOT(0,Cpos,NORM(V3(),SUB(V3(),m.pos2,Cpos)).ADD([0,.01,0]))
+        STIME=1
+        /*
+        &&m&&m2&&m.type!=m2.type
+        if(m.rdy>=1&&DIST(m.pos2,m2.pos2)<50){
+            SHOOT(m,V3(m.pos2),SUB(V3(),m2.pos2,m.pos2).ADD(m2.vel).ADD([0,.5,0]))
             m.rdy=0
             STIME=1
         }
+        */
     }
-    */
-
 
     ENDFRAME()
 }
