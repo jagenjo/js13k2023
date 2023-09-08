@@ -49,7 +49,7 @@ VIEW_M4=M4(),PROJ_M4=M4(),VP_M4=M4(),MVP_M4=M4(),/*FPLANES=0,*/CAM_EYE=V3(),CAM_
 CAMERA=(eye,center,up,fov,a,near=.1,far=1000,ortho=0)=>{CAM_EYE.set(eye);CAM_CENTER.set(center);SUB(CAM_FRONT,CAM_CENTER,CAM_EYE);NORM(CAM_FRONT,CAM_FRONT);CROSS(CAM_RIGHT,CAM_FRONT,up);NORM(CAM_RIGHT,CAM_RIGHT);LOOKAT(VIEW_M4,eye,center,up);ortho?ORTHO(PROJ_M4,-fov*a,fov*a,-fov,fov,near,far):PERSP(PROJ_M4,fov,a,near,far);MULTMAT4(VP_M4,PROJ_M4,VIEW_M4);/*EXTRACTPLANES(VP_M4)*/}
 INIT=(C)=>{if(!gl){gl=C.getContext("webgl2",{});_INITGL()}VIEWPORT(0,0,C.width,C.height)}
 INPUT=(C)=>{C.oncontextmenu=(e)=>false;C.onmousedown=C.onmouseup=C.onmousemove=(e)=>{e.preventDefault();MOUSE.delta[0]=e.pageX-MOUSE.pos[0]+e.movementX,MOUSE.delta[1]=e.pageY-MOUSE.pos[1]+e.movementY,MOUSE.pos[0]=e.pageX,MOUSE.pos[1]=e.pageY;MOUSE.buttons=e.buttons;if(window.ONMOUSE)ONMOUSE(e)};BODY.onwheel=(e)=>MOUSE.wheel=e.deltaY}
-ENDFRAME=()=>{MOUSE.delta.fill(0);KEYSP={};MOUSE.wheel=0;MOUSE.prevb=MOUSE.buttons}
+END=()=>{MOUSE.delta.fill(0);KEYSP={};MOUSE.wheel=0;MOUSE.prevb=MOUSE.buttons}
 VIEWPORT=(x,y,w,h)=>{VP_DATA.set([x,y,w,h]);gl.viewport(x,y,w,h)}
 
 //enable if yhou need them
@@ -61,7 +61,7 @@ VIEWPORT=(x,y,w,h)=>{VP_DATA.set([x,y,w,h]);gl.viewport(x,y,w,h)}
 //WebGL stuff ***********
 SHADER=(src,t=0)=>{
     var sh = gl.createShader(35632+t);
-    gl.shaderSource(sh,"#version 300 es\nprecision highp float;\n#define IN uniform\n#define S2D sampler2D\n#define NORM normalize\nin vec3 pos;\n"+(t?"":"out vec4 fragColor;\n")+src);
+    gl.shaderSource(sh,"#version 300 es\nprecision highp float;\n#define IN uniform\n#define NORM normalize\nin vec3 pos;\n"+(t?"":"out vec4 fragColor;\n")+src);
     gl.compileShader(sh);
     /* THIS CAN BE DELETED 
     if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {

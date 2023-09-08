@@ -1,6 +1,6 @@
 <!DOCTYPE html><html></html><head><title>XIII</title></head>
 <style>html,body{width:100%;height:100%;margin:0;padding:0;overflow:hidden;};</style>
-<canvas id="C" style="background:black"></canvas><div style="padding:10px;position:fixed;width:100%;top:0;left:0;font:24px monospace;color:white">Find the Caravan and stop it before it reaches Acre. Right Mouse to aim, Left to shoot. WSAD to move.</div>
+<canvas id="C" style="background:black"></canvas><div id=DIV style="padding:10px;position:fixed;width:100%;top:0;left:0;font:24px monospace;color:white">Find the Caravan and stop it before it reaches Acre. Right Mouse to aim, Left to shoot. WSAD to move.</div>
 <script src="microgl.js"></script>
 <script>
 var vs=`
@@ -21,7 +21,7 @@ IN float bw;
 out vec3 wpos;
 out vec4 vcol;
 vec3 ROTY(vec3 v,float a){vec2 t=vec2(sin(a),cos(a));return vec3(t.y*v.x-t.x*v.z,v.y,t.x*v.x+t.y*v.z);}
-float PI=3.1415926;
+float PI=${PI};
 void main(){
 wpos=pos;
 vcol=color;
@@ -39,7 +39,7 @@ wpos.y-=length(ceye-wpos)*.0001;
 #endif
 wpos=(model*vec4(wpos,1.0)).xyz;
 if(mat==4.0)wpos.y=.02;
-gl_Position = viewp*vec4(wpos,1.0);
+gl_Position=viewp*vec4(wpos,1.0);
 }
 `
 //if(mat==10.0)wpos=vec3(sin(1203.1*id*.5),0.0,-id/3.0)+ROTY(wpos,id*11.7);
@@ -55,11 +55,10 @@ vec3 scolor=vec3(.7,.6,.4);
 vec3 fcolor=vec3(.8,.5,.2);
 IN float time;
 IN float mat;
-void main() {
+void main(){
 vec3 N=NORM(cross(dFdx(wpos),dFdy(wpos)));
 vec3 L=NORM(vec3(.2,.7,-.8));
 vec4 C=(dot(N,L)*0.5+0.5)*vcol;
-if(mat==1.0)C.xyz+=vec3(0.02)*(fract(wpos.y*3.0)>0.95?-1.0:(fract(wpos.x+0.5*(floor(wpos.y*3.0)))>0.98?-1.0:1.0));
 if(mat==3.0&&wpos.x>75.0)C.xyz=mix(C.xyz,vec3(.3,.5,.6),min(1.0,(wpos.x-75.0)*.1));
 if(mat==3.0&&abs(wpos.x+sin(wpos.z/17.0))<2.0)C.xyz*=.9;
 if(mat==9.0&&N.y>0.2)C.xyz=vec3(.6,.1,.0);
@@ -70,8 +69,10 @@ fragColor=C;
 }
 `
 
+//if(mat==1.0)C.xyz+=vec3(0.02)*(fract(wpos.y*3.0)>0.95?-1.0:(fract(wpos.x+0.5*(floor(wpos.y*3.0)))>0.98?-1.0:1.0));
+
 var i=0,j=0
-ARP.p=ARP.push;ARP.m=ARP.map;ARP.c=ARP.concat
+ARP.p=ARP.push;ARP.m=ARP.map;ARP.c=ARP.concat;ARP.rand=function(){return this[RAND(this.length)|0]}
 
 INPUT(C)
 INIT(C)
@@ -140,7 +141,7 @@ var NOW=0,PREV=0,GTIME=0,STIME=5
 
 //GAME
 var BTS=[],bulletbuf=BUFFER(V3(1024*3),3),bulletbuf2=BUFFER(V3(1024*4),4)
-SHOOT=(id,pos,vel,s=30,t=10)=>{if(BTS.length<1023)BTS.p({id,pos,vel:V3(vel).SCALE(s),t,pos2:V3(pos)})}
+SHOOT=(id,pos,vel,s=20,t=10)=>{if(BTS.length<1023)BTS.p({id,pos,vel:V3(vel).SCALE(s),t,pos2:V3(pos)})}
 var PTS=[];NEWPT=(pos,vel,t=10)=>PTS.p({pos,vel,t})
 
 rrocks=[]
@@ -184,15 +185,15 @@ for(j=0;j<64;++j)
 
 
 //scene
-var objs=[],men=[],lid=0,Cdist=-200,Clife=1,Cpos=[0,0,0]
+var objs=[],men=[],lid=0,Clife=1,Cpos=[0,0.5,-200]
 //types=>0:archer,1:knight,2:horse,3:soldier,4:cart
 NEWMAN=(t,pos,ang=0,speed=0)=>{
-    var m={type:t,lean:0,arrows:15,off:[RAND(10,-5),0,RAND(10,-5)],color:[.5,.5,.5,1],rdy:1,id:lid++,pos,ang,speed,phase:RAND(),vel:V3(),life:1,pos2:ADD([],pos,[0,1.5,0])}
+    var m={type:t,lean:0,arrows:15,off:[RAND(50,-25),0,RAND(50,-25)],color:[.5,.5,.5,1],rdy:1,id:lid++,pos,ang,speed,phase:RAND(),vel:V3(),life:1,pos2:ADD([],pos,[0,1.5,0])}
     men.p(m)
     return m;
 }
-for(i=-5;i<5;++i){NEWMAN(0,[80+(!i?-2:0),0,i-RAND(.5)-250],PI/2,0);NEWMAN(1,[i-RAND(.5),0,-5+(!i?2:0)],PI,0)}
-var PLY=men[10],pidx=0,carnak=[0,-.2,-30]
+for(i=-8;i<=8;++i){if(ABS(i)<7)NEWMAN(0,[80+(!i?-2:0),0,i-RAND(.5)-300],PI/2,0);NEWMAN(1,[i-RAND(.5),0,-5+(!i?2:0)+Cpos[2]],PI,0)}
+var PLY=men[10],pidx=0
 
 //fort
 ADDOBJ=(mesh,unif)=>objs[objs.p({mesh,unif})-1]
@@ -218,7 +219,7 @@ for(i=-15;i<=15;++i)
     */
 }
 
-ADDOBJ("head",{mat:0,color:[.3,.1,.1,1],model:TRS(0,carnak,0,[.15,1.8,.15])})//carnak
+//ADDOBJ("head",{mat:0,color:[.3,.1,.1,1],model:TRS(0,carnak,0,[.15,1.8,.15])})//carnak
 ADDOBJ("house",{mat:0,color:[.4,.2,.1,1],model:TRS(0,[0,0,0],0,3)})//door
 var house=ADDOBJ("house",{mat:9,color:[.4,.5,.2,1],model:M4()})//truck
 //house.flag=ADDOBJ("flag",{mat:2,color:[1,.5,.2,1],model:M4()})//flag
@@ -278,7 +279,7 @@ loop=()=>{
     var m="head"
     DRAW("plane",sh,{mat:3,color:fcolor,model:TRS(HMODEL,[eye[0],0,eye[2]],0,300)})
     DRAW("house",sh_inst,{mat:0,color:fcolor,model:TRS(0,[0,0,100],0,3)},4,200,{offs:rocks})//town
-    DRAW("tower",sh_inst,{mat:0,color:fcolor,model:TRS(0,[0,0,100],[0,PI/2,0],3)},4,200,{offs:rocks})
+    //DRAW("tower",sh_inst,{mat:0,color:fcolor,model:TRS(0,[0,0,100],[0,PI/2,0],3)},4,200,{offs:rocks})
     for(j=-2;j<=2;++j){
         var z=ROUND(j+PLY.pos[2]/50)*50
         //DRAW(m,sh,{mat:10,color:[.4,.2,.1,1],model:TRS(0,[0,-.13,z],0,[1,.2,1])},4,200)//road
@@ -306,9 +307,8 @@ loop=()=>{
         DRAW("horse",sh_skin,{mat:0,bw,bones:frame.data,color:t?BLACK:BROWN,model:PMODEL})
         DRAW("horse",sh_skin,{mat:4,bw,bones:frame.data,color:shadowc,model:PMODEL})
         }
-        //knight
-        bodyang=NSIN(ph-.2)*.05
 
+        //body
         if(m.life<=0)TRS(PMODEL,m.pos,[PI/2,PI*1.04,PI/2],1)
 
         //legs
@@ -328,8 +328,8 @@ loop=()=>{
             if(m.life>0){
             MULTMAT4(AMODEL,HMODEL,armleft)
             DRAW("arm",sh,{mat:0,color:armcol,model:AMODEL})
-            MULTMAT4(AMODEL,HMODEL,armright)
-            DRAW("arm",sh,{model:AMODEL})
+            //MULTMAT4(AMODEL,HMODEL,armright)
+            //DRAW("arm",sh,{model:AMODEL})
             }
         }
         /*
@@ -405,8 +405,10 @@ loop=()=>{
         if(KEYS["E"])PLY.lean=1
         if(KEYS["Q"])PLY.lean=-1
     }
-    var tmen=[[],[],[],[],[]];men.forEach(a=>tmen[a.type].p(a))
-    if(KEYSP["Space"]){pidx=(pidx+1)%tmen[0].length;PLY=tmen[0][pidx]}
+    var tmen=[[],[],[],[]];men.forEach(a=>{if(a.life>0)tmen[a.type].p(a)})
+    if(!tmen[1].length&&Clife<=0)DIV.innerText="YOU CONQUERED ACRE"
+    if(!tmen[0].length||Cpos[2]>0)DIV.innerText="GAME LOST"
+    if(KEYSP["Space"]&&tmen[0].length)PLY=tmen[0].rand()
     camA+=PLY.ang-old
 
     if(PLY.rdy>=1&&PLY.arrows&&PLY.life==1&&MOUSE.buttons==3&&!(MOUSE.prevb==3))
@@ -418,14 +420,13 @@ loop=()=>{
     BTS.forEach((p,i)=>{
         if(p.t>0)p.pos2.set(p.pos);p.t-=dt;ADD(p.vel,p.vel,[0,-.5,0],dt);ADD(p.pos,p.pos,p.vel,dt);ADD(p.vel,p.vel,p.vel,-dt*.2);
         if(p.pos[1]<0){p.vel.fill(0);p.t=MIN(0,p.t)}//collided
-        if(p.t>0)men.forEach(k=>{if(p.id!=k&&DIST(k.pos2,p.pos)<.5){k.life=0;p.vel.fill(0);p.t=-10}})//arrow hit
-        if(p.t>0&&DIST(p.pos,Cpos)<2&&p.id)Clife-=.1
+        if(p.t>0)men.forEach(k=>{if(p.id!=k&&DIST(k.pos2,p.pos)<.5){k.life=0;p.t=-10}})//arrow hit
+        if(p.t>0&&DIST(p.pos,Cpos)<3&&p.id){Clife-=.1;p.t=-10}//caravan
+        if(p.t<0)p.vel.fill(0)
     })
     BTS=BTS.filter(p=>p.t>-5)//kill
-    PTS.forEach((p,i)=>{
-        p.t-=dt;ADD(p.pos,p.pos,p.vel,dt);ADD(p.vel,p.vel,p.vel,-dt*.8);
-    })
-    PTS=PTS.filter(p=>p.t>0)//kill    
+    PTS.forEach((p,i)=>{p.t-=dt;ADD(p.pos,p.pos,p.vel,dt);ADD(p.vel,p.vel,p.vel,-dt*.8);})
+    PTS=PTS.filter(p=>p.t>0)//kill
 
     //update
     men.forEach(m=>{
@@ -435,14 +436,16 @@ loop=()=>{
         m.ang=m.ang%(2*PI)
         if(t<3)ROTY(m.vel,[0,0,m.speed],m.ang)//speed only to horses
         ADD(p,p,m.vel,dt)
-        if(m!=PLY)
-        if(m!=PLY&&m.life>0&&t<2)//&&!m.type) //orient to target
+        if(t<2&&(!m.trg||m.trg.life<=0))m.trg=tmen[t?0:1].filter(a=>a.life>0).rand()//find target
+        var trgd=m.trg?DIST(m.pos,m.trg.pos):-1
+        if(trgd>40)m.trg=0
+        if(m!=PLY&&t<2)//&&!m.type) //orient to target
         {
-            var trg=ADD(V3(),PLY.pos,m.off)
-            var ang=ATAN2(m.pos[0]-trg[0],trg[2]-m.pos[2])%(2*PI)
+            var trg=m.trg?m.trg.pos2:ADD(V3(),t?Cpos:PLY.pos,m.off),ang=ATAN2(m.pos[0]-trg[0],trg[2]-m.pos[2])%(2*PI)
             if(ang<0)ang+=2*PI
             m.ang=LERP(m.ang,ABS(m.ang-ang)>PI?ang-2*PI:ang,.01)
-            m.speed=MAX(0,PLY.speed-SIN(m.id)*.5)
+            m.speed=3
+            if(RAND()<.002&&m.trg&&trgd<30&&m.arrows&&m.rdy==1){SHOOT(m,V3(m.pos2),NORM(V3(),SUB(V3(),trg,m.pos2).ADD([0,.5,0])));m.arrows-=1;m.rdy=0}
         }
         if(!focus||m!=PLY)
             m.speed=MIN(8,m.speed*0.997)//friction
@@ -450,34 +453,22 @@ loop=()=>{
         //if(m.pos[0]<-50||m.pos[2]>4)m.speed=0//out
         //m.pos[0]=CLAMP(m.pos[0],-50,4);m.pos[2]=CLAMP(m.pos[2],-50,50)
         ADD(m.pos2,p,[0,.5,0])
-        if(DIST(p,carnak)<.5)m.arrows=15//pickup
         m.rdy=MIN(1,m.rdy+dt*.25)
         if(DIST(CAM_EYE,p)<50&&m.speed>2&&RAND()>.9&&p[0]<75&&PTS.length<1023)NEWPT(V3(p),V3(m.vel).ADD([RAND()-.5,RAND(),RAND()-.5]),4)//smoke
     })
 
-    if(Clife>0)Cdist+=dt
-    Cpos=[0,.5,Cdist]
-    TRS(house.unif.model,[0,Clife>0?.2:-.1,Cdist],0,[1.5,1.5,3])
+    if(Clife>0)Cpos[2]+=dt*Clife
+    TRS(house.unif.model,[0,Clife>0?.2:-.1,Cpos[2]],0,[1.5,1.5,3])
     
-    var m=men[RAND(men.length)|0]
-    var m2=men[RAND(men.length)|0]
     if(STIME<0)
     {
-        //m.ang=ATAN2(PLY.pos2[0]-m.pos2[0],PLY.pos2[2]-m.pos2[2])
-        if(!m.type&&DIST(Cpos,m.pos)<40)
-            SHOOT(0,Cpos,NORM(V3(),SUB(V3(),m.pos2,Cpos)).ADD([0,.01,0]))
-        STIME=1
-        /*
-        &&m&&m2&&m.type!=m2.type
-        if(m.rdy>=1&&DIST(m.pos2,m2.pos2)<50){
-            SHOOT(m,V3(m.pos2),SUB(V3(),m2.pos2,m.pos2).ADD(m2.vel).ADD([0,.5,0]))
-            m.rdy=0
-            STIME=1
-        }
-        */
+        m=tmen[0].rand()
+        if(m&&!m.type&&DIST(Cpos,m.pos)<40)//caravan shoot
+            SHOOT(0,V3(Cpos),NORM(V3(),SUB(V3(),m.pos2,Cpos)).ADD([0,.01,0]))
+        STIME=2
     }
 
-    ENDFRAME()
+    END()
 }
 
 loop();
@@ -487,15 +478,6 @@ ONMOUSE=(e)=>{
 }
 
 /*
-//initialize lots of vars and some renames for shortness
-var L3D=LINES3D,P3D=POINTS3D,S3D=SHAPE3D,Z3=[0,0,0],RND=RANDOM,CDX=0,CDY=0
-var AP=Array.prototype;AP.p=AP.push;AP.random=()=>{return this[RAND(this.length)|0]}
-var ACX=0,BUF=0,ADEST=0,AVOL=0,AT=0,ACHANNELS=[],READY=0,ASEQS=[[80,82,81,85,83],[80,80,82,80,84,84,85,85],[90,92,94,96,98,100],[70,69,68,67,66,65,64,63,62,61,60,59]],ASEQI=0,TALERT=0
-PM=M4();PPOS=PM.subarray(12,15);PFRONT=PM.subarray(8,11);PPOSXZ=V3()
-PVEL=V3(Z3),PYAW=0,PPOWER=.5,PFORCE=0,PFUEL=1,PTURB=0,SHK=0,LIVES=4,HP=1,YAXIS=1,LOADED=0,PERSON=0,SCORE=0,TARGETS=[],ZOOM=1,ZL=[1,200,70,40,15],look=0
-F=0,PREV=TIME(),NOW=PREV,Q=1,NBLOCKS=0,NDOTS=0,GTIME=0,NTIME=0,NTARGET=0
-var eye=V3(),center=V3(),up=V3(),FOV=65
-
 //AUDIO
 NEWCHANNEL=()=>{
     var osc=ACX.createOscillator(),noise=ACX.createBufferSource(),filter=ACX.createBiquadFilter(),gain=ACX.createGain()
@@ -518,11 +500,6 @@ STARTAUDIO=()=>{
     ACHANNELS[1].osc.start()//alerts
     ACHANNELS[2].noise.start()//wind sound
 }
-
-//emits a particle
-EMIT=(p,v,t)=>{var P=[V3(p),V3(v),t];Ps.p(P);return P}
-
-
 */
 
 </script></html>
